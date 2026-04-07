@@ -29,23 +29,28 @@ class Database:
     
     # User operations
     def create_user(self, username: str, name: str) -> int:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('INSERT INTO users (username, name) VALUES (?, ?)', (username, name))
-            return cursor.lastrowid
-    
+        with self.driver.session() as session:
+            result = session.run(
+                'CREATE (u:User {id: randomId(), username: $username, name: $name}) RETURN u.id AS id',
+                username=username, name=name
+            )
+            return result.single()['id']
+
     def get_user(self, user_id: int) -> Optional[dict]:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT id, username, name FROM users WHERE id = ?', (user_id,))
-            row = cursor.fetchone()
-            return {'id': row[0], 'username': row[1], 'name': row[2]} if row else None
-    
+        with self.driver.session() as session:
+            result = session.run(
+                'MATCH (u:User {id: $id}) RETURN u.id AS id, u.username AS username, u.name AS name',
+                id=user_id
+            )
+            new_row = result.single()
+            return {'id': new_row['id'], 'username': new_row['username'], 'name': new_row['name']} if new_row else None
+
     def get_all_users(self) -> List[dict]:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT id, username, name FROM users')
-            return [{'id': row[0], 'username': row[1], 'name': row[2]} for row in cursor.fetchall()]
+        with self.driver.session() as session:
+            result = session.run(
+                'MATCH (u:User) RETURN u.id AS id, u.username AS username, u.name AS name'
+            )
+            return [{'id': new_row['id'], 'username': new_row['username'], 'name': new_row['name']} for new_row in result]
     
     # Post operations
     def create_post(self, user_id: int, content: str) -> int:
