@@ -1,25 +1,31 @@
 # social_network.py
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
-import sqlite3
+from neo4j import GraphDatabase
 from dataclasses import dataclass
 from typing import List, Optional
+import os
+
+from dotenv import load_dotenv
+load_dotenv()
 
 # ======================
 # Database Access Layer
 # ======================
 class Database:
-    def __init__(self, db_name='social_network.db'):
-        self.db_name = db_name
+    def __init__(self, uri=None, username=None, password=None):
+        self.driver = GraphDatabase.driver(
+            uri or os.environ.get('NEO4J_URI'),
+            auth=(
+                username or os.environ.get('NEO4J_USERNAME'),
+                password or os.environ.get('NEO4J_PASSWORD')
+            )
+        )
         self._init_db()
-    
+
     def _init_db(self):
-        print("Adding constraints for init")
         with self.driver.session() as session:
             session.run('CREATE CONSTRAINT unique_user_id IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE')
             session.run('CREATE CONSTRAINT unique_username IF NOT EXISTS FOR (u:User) REQUIRE u.username IS UNIQUE')
-    
-    def _get_connection(self):
-        return sqlite3.connect(self.db_name)
     
     # User operations
     def create_user(self, username: str, name: str) -> int:
